@@ -1,52 +1,65 @@
-DUSM network cost sample
-========================
+---
+page_type: sample
+languages:
+- cpp
+products:
+- windows-api-win32
+name: DUSM network cost sample
+description: The network cost sample demonstrates the features of Data Usage and Subscription Management (DUSM).
+extendedZipContent:
+- path: LICENSE
+  target: LICENSE
+---
 
-The network cost sample allows the application developer to play with the features of the DUSM (Data Usage and Subscription Management).This sample allows the user to get local machine cost, destination cost and connection cost. The user can register for cost change notifications for machine cost, destination cost and connection cost and receive the new cost when there is a cost change event.
+# DUSM network cost sample
 
-**Note**  While the DUSM feature allows the user to register for cost change notifications for multiple destination addresses, this sample restricts registration for cost change notifications to a single destination address at a time for the sake of simplicity.
+The network cost sample demonstrates the features of Data Usage and Subscription Management (DUSM).
+This sample allows the user to get local machine cost, destination cost and connection cost. The user can register for cost change
+notifications for machine cost, destination cost and connection cost and receive the new cost when there is a cost change event.
 
-**Warning**  This sample requires Microsoft Visual Studio 2013 or a later version (any SKU) and will not compile in Microsoft Visual Studio Express 2013 for Windows.
+These are few points to note about this sample app:
 
-**Note**  The Windows-classic-samples repo contains a variety of code samples that exercise the various programming models, platforms, features, and components available in Windows and/or Windows Server. This repo provides a Visual Studio solution (SLN) file for each sample, along with the source files, assets, resources, and metadata needed to compile and run the sample. For more info about the programming models, platforms, languages, and APIs demonstrated in these samples, check out the documentation on the [Windows Dev Center](https://dev.windows.com). This sample is provided as-is in order to indicate or demonstrate the functionality of the programming models and feature APIs for Windows and/or Windows Server. This sample was created for Windows 8.1 and/or Windows Server 2012 R2 using Visual Studio 2013, but in many cases it will run unaltered using later versions. This sample was created for Windows 8.1 and/or Windows Server 2012 R2 using Visual Studio 2013, but in many cases it will run unaltered using later versions. Please provide feedback on this sample!
+1. The DUSM feature API allows the user to register for cost change notifications for multiple destination addresses, using
+SetDestinationAddresses; although the NetCostSample SDK restricts the user to register for cost change notifications for single
+destination address at a time. This is done to make the sample SDK simple.
 
-To get a copy of Windows, go to [Downloads and tools](http://go.microsoft.com/fwlink/p/?linkid=301696).
+2. When the user registers for cost change notifications, since the events are out-of-band this sample, the events have to be generated
+by doing one of the following:
 
-To get a copy of Visual Studio, go to [Visual Studio Downloads](http://go.microsoft.com/fwlink/p/?linkid=301697).
+    - Connect or disconnect Ethernet
+    - Switch between mobile broadband and Wi-Fi
+    - Change cost for mobile broadband using WCM Sample SDK which defines the use of set cost feature for WCM API.
 
-Related topics
---------------
+3. While the DUSM feature allows the user to register for cost change notifications for multiple destination addresses, this sample restricts registration for cost change notifications to a single destination address at a time for the sake of simplicity.
 
-[**INetworkCostManager**](http://msdn.microsoft.com/en-us/library/windows/desktop/hh448257)
+**Note** The Windows-classic-samples repo contains a variety of code samples that exercise the various programming models, platforms, features, and components available in Windows and/or Windows Server. This repo provides a Visual Studio solution (SLN) file for each sample, along with the source files, assets, resources, and metadata needed to compile and run the sample. For more info about the programming models, platforms, languages, and APIs demonstrated in these samples, check out the documentation on the [Windows Dev Center](https://developer.microsoft.com/windows/). This sample is provided as-is in order to indicate or demonstrate the functionality of the programming models and feature APIs for Windows and/or Windows Server.
 
-[**INetworkConnectionCostEvents**](http://msdn.microsoft.com/en-us/library/windows/desktop/hh448252)
+To get a copy of Windows, go to [Downloads and tools](https://go.microsoft.com/fwlink/p/?linkid=301696).
 
-Related technologies
---------------------
+To get a copy of Visual Studio, go to [Visual Studio Downloads](https://go.microsoft.com/fwlink/p/?linkid=301697).
 
-[Network List Manager](http://msdn.microsoft.com/en-us/library/windows/desktop/aa370803)
+## Related topics
 
-Operating system requirements
------------------------------
+[**INetworkCostManager**](https://learn.microsoft.com/windows/win32/api/netlistmgr/nn-netlistmgr-inetworkcostmanager)
 
-Client
+[**INetworkConnectionCostEvents**](https://learn.microsoft.com/windows/win32/api/netlistmgr/nn-netlistmgr-inetworkconnectioncostevents)
 
-Windows 8.1
+## Related technologies
 
-Server
+[Network List Manager](https://learn.microsoft.com/windows/win32/nla/portal)
 
-Windows Server 2012 R2
+## System requirements
 
-Build the sample
-----------------
+- Requires Windows SDK 10.0.22621.0 to build and Windows 8.1 to run.
 
-1.  Start Visual Studio and select **File** \> **Open** \> **Project/Solution**.
+## Build the sample
 
-2.  2. Go to the directory named for the sample, and double-click the Microsoft Visual Studio Solution (.sln) file.
+1. Start Visual Studio and select **File** \> **Open** \> **Project/Solution**.
 
-3.  Press F6 or use **Build** \> **Build Solution** to build the sample.
+2. Go to the directory named for the sample, and double-click the Microsoft Visual Studio Solution (.sln) file.
 
-Run the sample
---------------
+3. Press F6 or use **Build** \> **Build Solution** to build the sample.
+
+## Run the sample
 
 To debug the app and then run it, press F5 or use **Debug** \> **Start Debugging**. To run the app without debugging, press Ctrl+F5 or use **Debug** \> **Start Without Debugging**.
-
