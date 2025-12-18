@@ -29,6 +29,10 @@ public:
     {
         return Equals(otherMonitor);
     }
+    bool operator!=(const MonitorData& otherMonitor) const noexcept
+    {
+        return !Equals(otherMonitor);
+    }
     bool Equals(const MonitorData& otherMonitor) const noexcept;
 
     // Compares only the device name (the string) for two monitors. This is
@@ -41,15 +45,29 @@ private:
     static BOOL MonitorEnumProc(HMONITOR, HDC, PRECT, LPARAM);
 
 public:
-    // The HMONITOR is the system's handle for this monitor, which can be
-    // used by APIs that take a monitor, like GetMonitorInfo.
+    // The HMONITOR is the system's handle for this monitor, which can be used
+    // by APIs that take a monitor, like GetMonitorInfo.
     // WARNING: This handle can become invalid at any time! It is best to read
     // all needed data about a monitor before making any changes, and not
-    // assuming that the handle is still valid later.
+    // assume that the handle is still valid later.
     HMONITOR handle = nullptr;
 
     // The monitor rect is the position/size of the monitor. These values are
-    // in screen coordinates, where the primary monitor origin is 0, 0.
+    // in screen coordinates, and show the size of each monitor (resolution),
+    // as well as the relative position of each monitor. There is always one
+    // monitor, the primary monitor, whose origin (top left corner) is 0,0.
+    //                              ┌─────────────────────────┐
+    //                              │ Primary (0, 0)          │
+    //                              │ [0, 0, 1920, 1080]      │
+    //                              │                         │
+    //   ┌────────────────────────┐ │                         │
+    //   │ Secondary (1280, 960)  │ │                         │
+    //   │ [-1280, 800, 0, 1760]  │ │                         │
+    //   │                        │ └─────────────────────────┘
+    //   │                        │
+    //   │                        │
+    //   │                        │
+    //   └────────────────────────┘
     RECT monitorRect = {};
 
     // The work area is a subset of the monitor rect. This is the part of the

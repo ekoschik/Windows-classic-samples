@@ -418,10 +418,6 @@ CurrentMonitorTopology::MonitorFromPoint(
             // small monitor that are both close to a point would prefer the
             // smaller monitor (because its center is closer to the point,
             // even if the wider monitor's edge is really closer).
-            //
-            // See the MonitorFromPoint implementation (internal):
-            // MONITORFROMPOINTALGORITHM, onecoreuap/windows/core/ntuser/rtl/mmrtl.cxx
-            // https://microsoft.visualstudio.com/DefaultCollection/OS/_git/0d54b6ef-7283-444f-847a-343728d58a4d?path=%2fonecoreuap%2fwindows%2fcore%2fntuser%2frtl%2fmmrtl.cxx&version=GBofficial/ge_current_directadept_hip1&line=126&lineEnd=126&lineStartColumn=8&lineEndColumn=34&lineStyle=plain
 
             POINT ptCenter = {
                 rc.left + (RECTWIDTH(rc) / 2),
@@ -510,13 +506,8 @@ CurrentMonitorTopology::MonitorFromRect(
     {
         case Fallback::Nearest:
             // Return the monitor that is closest to the center of the rect.
-            //
             // TODO: This is an approximation. It may not be the best (closest)
             // monitor to the point. We could consider improving this.
-            //
-            // See MonitorFromRect implementation (internal):
-            // MONITORFROMRECTALGORITHM, onecoreuap/windows/core/ntuser/rtl/mmrtl.cxx
-            // https://microsoft.visualstudio.com/DefaultCollection/OS/_git/0d54b6ef-7283-444f-847a-343728d58a4d?path=%2fonecoreuap%2fwindows%2fcore%2fntuser%2frtl%2fmmrtl.cxx&version=GBofficial/ge_current_directadept_hip1&line=371&lineEnd=371&lineStartColumn=8&lineEndColumn=33&lineStyle=plain
             return MonitorFromPoint({
                 rc.left + (RECTWIDTH(rc) / 2),
                 rc.top + (RECTHEIGHT(rc) / 2)

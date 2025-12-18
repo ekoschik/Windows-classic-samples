@@ -1,5 +1,8 @@
 #pragma once
 
+// Dynamically loads the API to allow running on older releases.
+bool ApplyWindowActionWrapper(HWND hwnd, WINDOW_ACTION* action);
+
 //
 // CWindowAction
 //
@@ -25,7 +28,7 @@ class CWindowAction : public WINDOW_ACTION
 public:
     CWindowAction()
     {
-        RtlZeroMemory(this, sizeof(this));
+        RtlZeroMemory(this, sizeof(*this));
     }
 
     // Calls ApplyWindowAction to apply the changes in the action to the window.
@@ -194,7 +197,7 @@ public:
 };
 
 // ApplyWindowAction is dynamically loaded the first time it is called.
-using fnApplyWindowAction = BOOL(*)(HWND hwnd, WINDOW_ACTION* action);
+typedef BOOL (__stdcall *fnApplyWindowAction)(HWND, WINDOW_ACTION*);
 
 // Called once per process to load ApplyWindowAction (and check if supported).
 inline fnApplyWindowAction LoadApplyWindowActionApi()

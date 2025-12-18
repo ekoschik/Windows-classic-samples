@@ -44,7 +44,7 @@ If two windows overlap, the one above generally occludes the one below. (Note th
 this isn't always the case - some windows can be partially or completely
 transparent, or cloaked.)
 
-Every thread has a single Active window, which is one of it's top level windows.
+Every thread has a single Active window, which is one of its top level windows.
 (Note: two or more threads can be 'joined', meaning the threads are synchronized
 for input. There is only one active window for each input 'queue', or group of
 joined threads.) Clicking on a window, or alt-tab to navigate to a window,
@@ -76,17 +76,14 @@ For example, these are some of the SetWindowPos flags:
 
 The API `ShowWindow` can **Maximize**, **Minimize**, and **Restore** a window.
 
-**Maximized** windows fit the monitor. By default, this will moves the window's
+**Maximized** windows fit the monitor. By default, this moves the window's
 resize borders *outside* the work area. Moving the cursor to the top of the
 monitor and dragging should *move* a Maximized window, not resize, and moving
 the cursor to the top-right corner of the monitor should put it over the close
 button.
 
 **Minimized** windows are normally off-screen and can be restored by clicking on
-the Taskbar, or pressing Alt-Tab. On SKUs without a Shell (or a Taskbar), the
-default Minimize position is a small size that only shows the window's caption
-buttons, positioned near the bottom-left corner of the monitor (aka 'parked' or
-'iconic').
+the Taskbar, or pressing Alt-Tab.
 
 If the window is not in a special state like Maximized/Minimized, the window is
 'normal', or **Restored**. When a normal window becomes Maximized/Minimized, its
@@ -226,8 +223,7 @@ Doing so can cause a window to be off screen or in unexpected places.
 
 It is important to handle failures when using HMONITOR APIs, even when using
 `MONITOR_DEFAULTTONEAREST`. The handle this call returns will never be null, but
-it could become invalid before it is used. All monitor data should be queried
-before making any changes to the window position or other state.
+it could become invalid before it is used.
 
 ```cpp
 MONITORINFOEX mi { sizeof(mi) };
@@ -239,12 +235,16 @@ if (!GetMonitorInfo(MonitorFromRect(&rc, MONITOR_DEFAULTTONEAREST), &mi))
 ```
 
 Apps sometimes query the monitors very frequently, which can make these
-'very rare' error cases difficult to handle, or expensive to compute. See
+edge error cases difficult to handle, or expensive to compute. See
 [CurrentMonitorTopology.h](cpp\inc\CurrentMonitorTopology.h), which defines a cache
-for the monitor data that addresses these issues.
+for the monitor data. Caching the monitors removes the need to handle errors
+when querying the monitors, moving these errors to display changes (where the
+app can more easily wait for the next display change). This header also uses a
+new API [GetCurrentMonitorTopologyId](https://learn.microsoft.com/en-us/windows/win32/winmsg/winuser/nf-winuser-getcurrentmonitortopologyid)
+to avoid extra work when the monitors haven't actually changed.
 
 Starting in Win11, the system will remember where apps are when monitors are
-disconnected and move apps back if the monitor is re-connected. This 'memory'
+disconnected and move apps back if the monitor is reconnected. This 'memory'
 is currently not exposed to apps. This means that if an app restarts (or the
 system reboots), this previous position data is lost.
 
@@ -283,10 +283,15 @@ It is possible for a thread to change its awareness, using
 When a window is created, it is 'stamped' with the thread awareness at the
 time, and the thread will automatically switch back to that awareness when
 dispatching messages to the window. This allows a thread to create two windows
-with different awarenesses, which means the coordinates seen by the two windows
+with different awareness, which means the coordinates seen by the two windows
 will be different.
 
 ### DPI Virtualization
+
+Virtualized apps can get scaled up or down by the system when the app's DPI
+does not match the monitor DPI. When the app is scaled like this, its content
+becomes blurry. This is most noticeable for text, because this stretching can
+make the text harder to read.
 
 Windows that are Virtualized for DPI (not Per-Monitor DPI Aware) do not share
 the same screen coordinates as other apps!
@@ -297,18 +302,78 @@ DPI monitor, and each one queries the cursor position
 the two windows will get different answers! The output of the Unaware window is
 being scaled by a 2x transform, so it's cursor position, window position, monitor
 rects, and EVERYTHING the window observes is scaled DOWN by the same transform.
+If each window calls GetWindowRect on the other window, each one would see a
+value scaled to its own DPI, which doesn't match the RECT the other app sees.
+(The two apps have different screen coordinates.)
 
-On systems with multiple monitors at different DPIs, these transforms can
-include more than a scale. For example, the Unaware window on a secondary
-monitor may have a transform with both a scale and an offset. It is not
-recommended to attempt to compute this transform.
+IMPORTANT: Virtualized apps should not use coordinates on other monitors! When
+a virtualized app moves between monitors with different scale factors, the
+window's screen coordinates change (because the app's output is being scaled by
+a different amount). For example, an unaware app may move from one monitor to
+another, and find that this causes one both monitors to change size! Apps that
+need to consider positions on other monitors should always run as Per-Monitor
+DPI Aware (not virtualized).
 
-Virtualized apps, when scaled up or down to the monitor DPI, become blurry
-(their content is stretched). This can cause text rendered by the window to be
-harder to read. Additionally, because virtualized apps can change their
-transform when moving between monitors, it is recommended for any app that
-needs to consider positions on multiple monitors to always NOT be virtualized
-(Per-Monitor DPI Aware).
+IMPORTANT: Do not scale screen coordinates by a DPI! If two windows or apps
+running at a different DPI awareness send coordinates directly to each other,
+it may be necessary to transform between virtualized screen coordinates. This
+should be done using [SetThreadDpiAwarenessContext](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddpiawarenesscontext),
+which allows apps to switch between DPI awareness values. (Querying the same
+thing, like a window rect, from different awareness values is enough to know
+the relative transform between two windows.) Scaling by a DPI is not sufficient!
+The transform applied by the system to virtualized apps can contain an offset
+in addition to a scale. Values computed only by scaling by a DPI might put
+windows in unexpected positions on screen.
+
+The example below assumes that an app has multiple windows with different
+awareness values, and needs to convert screen coordinates for a virtualized
+window to physical (Per-Monitor Aware). While this does work with apps in
+different processes, note that System DPI Aware uses a per-process DPI value,
+the primary monitor when the process launched. If the primary monitor changes
+DPI between two processes launching, system aware windows in the different
+apps will have different coordinate spaces.
+
+```cpp
+POINT TransformPointBetweenRects(
+    const POINT& pt,
+    const RECT& rcFrom,
+    const RECT& rcTo)
+{
+    const int scaleFrom = rcFrom.right - rcFrom.left;
+    const int scaleTo = rcTo.right - rcTo.left;
+    const POINT originFrom = { rcFrom.left, rcFrom.top };
+    const POINT originTo = { rcTo.left, rcTo.top };
+
+    return {
+        originTo.x + MulDiv(ppt->x - originFrom.x, scaleTo, scaleFrom),
+        originTo.y + MulDiv(ppt->y - originFrom.y, scaleTo, scaleFrom)
+    };
+}
+
+POINT LogicalToPhysicalPointForWindow(HWND hwnd, const POINT& pt)
+{
+    DPI_AWARENESS_CONTEXT windowDpiContext = GetWindowDpiAwarenessContext(hwnd);
+
+    if (GetDpiFromDpiAwarenessContext(windowDpiContext) == 0)
+    {
+        return pt;
+    }
+
+    RECT rcLogical{};
+    RECT rcPhysical{};
+    DPI_AWARENESS_CONTEXT dpiPrev =
+        SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+    GetWindowRect(hwnd, &rcPhysical);
+    SetThreadDpiAwarenessContext(windowDpiContext);
+    GetWindowRect(hwnd, &rcLogical);
+    SetThreadDpiAwarenessContext(dpiPrev);
+
+    // Transform the point from logical to physical.
+    // Note: Reversing the RECT params would convert physical to logical.
+    return TransformPointBetweenRects(pt, rcLogical, rcPhysical);
+}
+```
 
 ### Per-Monitor DPI Aware
 
@@ -317,18 +382,31 @@ that they must scale themselves for DPI.
 
 Consider a browser window showing a web page, where a picture and paragraph of
 text is visible, but if you scroll there is much more text. When moving from a
-200% DPI monitor to a 100% DPI monitor, the window should change the window size
-(making the window half the size) and change the scale from 2x to 1x. This
-causes the window to appear the same size and show the same content to the user
-(because it is now shown on a monitor whose pixels are twice as large as the
-previous monitor). If the app did nothing, the window would appear to double in
-size. And if the app kept the same size and only changed the content scale, the
-window would double in size and show 4x more content (more than the previous
-single paragraph).
+200% DPI monitor to a 100% DPI monitor, the window should appear to the user to
+stay the same size. (The window should be the same size and it should fit the
+same amount of content.) Because the monitors have different DPIs, the physical
+size of the window and the content scale must change to account for the different
+in pixel density on the two displays.
 
-When positioning windows, Per-Monitor DPI aware apps must consider the DPI of
-the window. These apps must also respond to DPI changes,
+If the window is initially size 1000 x 1000 on the 200% monitor, it should be
+500 x 500 on the 100% monitor. Similarly, the content scale should be decreased
+by half. (If the user is zoomed to 150% zoom, that value should not change when
+changing monitors, but internally the app may apply the DPI by adjusting the
+same transform.)
+
+Changing only the window size or content scale would cause the window to grow or
+shrink in size (either becoming larger or zoomed in/out). Furthermore, changing
+these things at different times would cause the window to appear to 'jump' twice
+(showing an intermediate state where either the window size or content is at the
+wrong size).
+
+Per-Monitor DPI aware apps must respond to DPI changes,
 [`WM_DPICHANGED`](https://learn.microsoft.com/en-us/windows/win32/hidpi/wm-dpichanged).
+This message is sent when a window's DPI changes, and contains a RECT with the
+new window position and size. The window is expected to move itself (call
+`SetWindowPos`) with this RECT, after updating any state necessary for DPI
+changes. (For example, prior to moving the window may need to update it's fonts
+or other assets, so that they are scaled to the new window DPI.)
 
 Apps that want to control their size on DPI changes should use
 [`WM_GETDPISCALEDSIZE`](https://learn.microsoft.com/en-us/windows/win32/hidpi/wm-getdpiscaledsize),
@@ -349,18 +427,21 @@ needs to scale these values by a DPI scale before they end up on screen.
 For example, 12 logical pixels on a 150% scale monitor correspond to 18 physical
 pixels.
 
-Screen coordinates are *always* used in in physical pixels. Because different
-monitors can have different DPIs, screen coordinates are 'non-uniform', which
-means they cannot always be scaled by a single DPI value. Computing 'logical
-screen coordinates' risks using different DPIs when scaling to/from physical,
-and can lead to bogus coordinates and windows in unexpected positions. This is
-different from client coordinates, or ones relative to the window or monitor
-origin, which are uniform and can be scaled by the window or monitor DPI.
+IMPORTANT: Screen coordinates are *always* measured in in physical pixels. This
+is important because screen coordinates span all the monitors, and each monitor
+can have a different DPI. This makes screen coordinates 'non-uniform'. This
+means they cannot be scaled by a single DPI value. Computing 'logical screen
+coordinates' risks using different DPIs when scaling to/from physical, and can
+lead to bogus coordinates and windows in unexpected positions. This is different
+from client coordinates, or 'monitor relative' (which isn't commonly used),
+because top level windows and monitors always have a single DPI (these
+coordinate spaces are 'uniform', so you can unambiguously scale to/from logical
+values.
 
 The API that returns the DPI a window is currently scaling to is
 [`GetDpiForWindow`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdpiforwindow).
 
-> IMPORTANT: Do not use `MonitorFromWindow`/`GetDpiForMonitor` to determine a
+IMPORTANT: Do not use `MonitorFromWindow`/`GetDpiForMonitor` to determine a
 window's DPI! In most cases, the DPI of a monitor that a window is mostly on
 will match the window's DPI, but this is not a guarantee. Using GetDpiForMonitor
 to scale content in a window can cause the window to 'jump' (rescale) twice when
@@ -428,7 +509,7 @@ Maximized windows), and do not have the caption or resize border window styles,
 operates similarly to Maximized. Enter FullScreen moves the window, and exiting
 returns the window to its previous position.
 
-For example, pressing f11 in a browser window generally makes it FullScreen.
+For example, pressing F11 in a browser window generally makes it FullScreen.
 
 - Try Maximizing the window prior to FullScreen. Exiting should exit first to
   Maximize (staying sized to the screen but adding the title bar and revealing
